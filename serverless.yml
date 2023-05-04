@@ -1,0 +1,74 @@
+service: websocket-service
+
+# plugins:
+#   - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: non-linux
+
+package:
+  exclude:
+    - node_modules/**
+    - venv/**
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: dev
+  region: ap-south-1
+  iamManagedPolicies:
+  - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+  versionFunctions: false
+  timeout: 29
+
+
+
+
+functions:
+
+  connectHandler:
+    handler: websocket_handlers/aws_ws_connect_handler.handle
+    events:
+      - websocket:
+          route: $connect
+    environment:
+      SOCKET_CONNECTIONS_TABLE_NAME: websocket-connections
+
+  disconnectHandler:
+    handler: websocket_handlers/aws_ws_disconnect_handler.handle
+    events:
+      - websocket: $disconnect
+    environment:
+      SOCKET_CONNECTIONS_TABLE_NAME: websocket-connections
+
+  onMessageHandler:
+    handler: websocket_handlers/aws_ws_custom_handler.handle
+    events:
+      - websocket:
+          route: onMessage
+    environment:
+      SOCKET_CONNECTIONS_TABLE_NAME: websocket-connections
+
+
+
+
+
+resources:
+  Resources:
+    socketConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: websocket-connections
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: true
